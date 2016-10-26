@@ -154,6 +154,13 @@ namespace ompl
                 /** \brief The number of steps the control is applied for */
                 unsigned int steps;
 
+                std::vector<base::State*> states;
+
+                std::vector<Control*> controls;
+
+                std::vector<unsigned int> controlSteps;
+
+
                 /** \brief The parent motion in the exploration tree */
                 Motion *parent;
             };
