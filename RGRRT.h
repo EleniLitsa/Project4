@@ -62,13 +62,13 @@ namespace ompl
         */
 
         /** \brief Rapidly-exploring Random Trees */
-        class RRT : public base::Planner
+        class RGRRT : public base::Planner
         {
         public:
             /** \brief Constructor */
-            RRT(const base::SpaceInformationPtr &si);
+            RGRRT(const base::SpaceInformationPtr &si);
 
-            ~RRT() override;
+            ~RGRRT() override;
 
             void getPlannerData(base::PlannerData &data) const override;
 
