@@ -34,8 +34,8 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef OMPL_CONTROL_PLANNERS_RRT_RRT_
-#define OMPL_CONTROL_PLANNERS_RRT_RRT_
+#ifndef OMPL_CONTROL_PLANNERS_RGRRT_RGRRT_
+#define OMPL_CONTROL_PLANNERS_RGRRT_RGRRT_
 
 #include "ompl/control/planners/PlannerIncludes.h"
 #include "ompl/datastructures/NearestNeighbors.h"
@@ -62,13 +62,13 @@ namespace ompl
         */
 
         /** \brief Rapidly-exploring Random Tree */
-        class RRT : public base::Planner
+        class RGRRT : public base::Planner
         {
         public:
             /** \brief Constructor */
-            RRT(const SpaceInformationPtr &si);
+            RGRRT(const SpaceInformationPtr &si);
 
-            ~RRT() override;
+            ~RGRRT() override;
 
             /** \brief Continue solving for some amount of time. Return true if solution was found. */
             base::PlannerStatus solve(const base::PlannerTerminationCondition &ptc) override;

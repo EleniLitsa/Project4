@@ -34,12 +34,12 @@
 
 /* Author: Ioan Sucan */
 
-#include "ompl/control/planners/rrt/RRT.h"
+#include "RGRRT.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
 #include <limits>
 
-ompl::control::RRT::RRT(const SpaceInformationPtr &si) : base::Planner(si, "RRT")
+ompl::control::RGRRT::RGRRT(const SpaceInformationPtr &si) : base::Planner(si, "RRT")
 {
     specs_.approximateSolutions = true;
     siC_ = si.get();
@@ -48,16 +48,16 @@ ompl::control::RRT::RRT(const SpaceInformationPtr &si) : base::Planner(si, "RRT"
 
     goalBias_ = 0.05;
 
-    Planner::declareParam<double>("goal_bias", this, &RRT::setGoalBias, &RRT::getGoalBias, "0.:.05:1.");
-    Planner::declareParam<bool>("intermediate_states", this, &RRT::setIntermediateStates, &RRT::getIntermediateStates);
+    Planner::declareParam<double>("goal_bias", this, &RGRRT::setGoalBias, &RGRRT::getGoalBias, "0.:.05:1.");
+    Planner::declareParam<bool>("intermediate_states", this, &RGRRT::setIntermediateStates, &RGRRT::getIntermediateStates);
 }
 
-ompl::control::RRT::~RRT()
+ompl::control::RGRRT::~RGRRT()
 {
     freeMemory();
 }
 
-void ompl::control::RRT::setup()
+void ompl::control::RGRRT::setup()
 {
     base::Planner::setup();
     if (!nn_)
@@ -68,7 +68,7 @@ void ompl::control::RRT::setup()
                              });
 }
 
-void ompl::control::RRT::clear()
+void ompl::control::RGRRT::clear()
 {
     Planner::clear();
     sampler_.reset();
@@ -79,7 +79,7 @@ void ompl::control::RRT::clear()
     lastGoalMotion_ = nullptr;
 }
 
-void ompl::control::RRT::freeMemory()
+void ompl::control::RGRRT::freeMemory()
 {
     if (nn_)
     {
@@ -96,7 +96,7 @@ void ompl::control::RRT::freeMemory()
     }
 }
 
-ompl::base::PlannerStatus ompl::control::RRT::solve(const base::PlannerTerminationCondition &ptc)
+ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTerminationCondition &ptc)
 {
     checkValidity();
     base::Goal *goal = pdef_->getGoal().get();
@@ -266,7 +266,7 @@ ompl::base::PlannerStatus ompl::control::RRT::solve(const base::PlannerTerminati
     return base::PlannerStatus(solved, approximate);
 }
 
-void ompl::control::RRT::getPlannerData(base::PlannerData &data) const
+void ompl::control::RGRRT::getPlannerData(base::PlannerData &data) const
 {
     Planner::getPlannerData(data);
 
