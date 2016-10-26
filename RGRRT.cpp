@@ -105,6 +105,9 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     while (const base::State *st = pis_.nextStart())
     {
         auto *motion = new Motion(siC_);
+        std::vector<base::State*> states=motion->states;
+        std::vector<Control*> controls=motion->controls;
+        
         si_->copyState(motion->state, st);
         siC_->nullControl(motion->control);
         nn_->add(motion);
@@ -130,6 +133,7 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     auto *rmotion = new Motion(siC_);
     base::State *rstate = rmotion->state;
     Control *rctrl = rmotion->control;
+    
     base::State *xstate = si_->allocState();
 
     while (ptc == false)
