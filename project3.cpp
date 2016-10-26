@@ -4,7 +4,7 @@
 #include <functional>
 
 // Including SimpleSetup.h will pull in MOST of what you need to plan
-#include <ompl/geometric/SimpleSetup.h>
+#include <ompl/control/SimpleSetup.h>
 // Except for the state space definitions and any planners
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/base/spaces/SO2StateSpace.h>

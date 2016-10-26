@@ -19,14 +19,13 @@ LD_FLAGS=-L${OMPL_DIR}/lib -lompl -lompl_app_base  -lompl_app -lboost_program_op
 # The c++ compiler to invoke
 CXX=c++
 
-all:	project3test 
+all:	testrun 
 
 clean:
 	rm -f *.o
-	rm -f project3
-	rm -f Benchmark
-project3test: RGRRT.o project3.o CollisionChecking.o
-	$(CXX) $(CXXFLAGS) $(INCLUDE_FLAGS) -o project3 project3.o CollisionChecking.o RGRRT.o  $(LD_FLAGS)
+	rm -f testrun
+testrun: RGRRT.o odeSample.o 
+	$(CXX) $(CXXFLAGS) $(INCLUDE_FLAGS) -o testrun odeSample.o RGRRT.o  $(LD_FLAGS)
 
 
 %.o: %.cpp
