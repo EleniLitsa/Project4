@@ -40,6 +40,9 @@
 #include "ompl/control/planners/PlannerIncludes.h"
 #include "ompl/datastructures/NearestNeighbors.h"
 
+namespace ob = ompl::base;
+namespace oc = ompl::control;
+
 namespace ompl
 {
     namespace control
@@ -172,6 +175,12 @@ namespace ompl
             double distanceFunction(const Motion *a, const Motion *b) const
             {
                 return si_->distance(a->state, b->state);
+            }
+
+            /** \brief Compute distance between a motion and a state (actually distance between contained states) */
+            double distanceFunction2(const Motion *a, const base::State *b) const
+            {
+                return si_->distance(a->state, b);
             }
 
             /** \brief State sampler */

@@ -37,6 +37,7 @@
 #include "RGRRT.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
+#include "ompl/control/spaces/RealVectorControlSpace.h"
 #include <limits>
 
 ompl::control::RGRRT::RGRRT(const SpaceInformationPtr &si) : base::Planner(si, "RRT")
@@ -102,12 +103,41 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     base::Goal *goal = pdef_->getGoal().get();
     base::GoalSampleableRegion *goal_s = dynamic_cast<base::GoalSampleableRegion *>(goal);
 
+    //number of controls to consider when searching for R(q)
+    int numControls=10;
+
+    //find the bounds of the control space
+    std::shared_ptr<oc::ControlSpace> cspace = siC_->getControlSpace();
+    RealVectorControlSpace* cvspace = cspace->as<RealVectorControlSpace>();
+    ob::RealVectorBounds cbounds = cvspace->getBounds();
+    double low=cbounds.low[0];
+    double high=cbounds.high[0];
+
+
+    //ob::RealVectorBounds cbounds = dynamic_cast<std::shared_ptr<RealVectorControlSpace>>(cspace) ->getBounds();
+
     while (const base::State *st = pis_.nextStart())
     {
         auto *motion = new Motion(siC_);
         std::vector<base::State*> states=motion->states;
         std::vector<Control*> controls=motion->controls;
-        
+
+        //add R(q) to controls and states.
+        double cValue=0.0;
+        double step=(high-low)/numControls;
+        for(int i=0;i<numControls;i++){
+            //RealVectorControlSpace* control = siC_->allocControl()->as<RealVectorControlSpace>();
+            //Control *control = siC_->allocControl();
+            RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
+            //RealVectorControlSpace::ControlType* control = *(siC_->allocControl()) ->as<RealVectorControlSpace::ControlType*>();
+            control->values[0]=cValue;
+            controls.push_back(control);
+            base::State *reachState;
+            siC_->propagate(st,control,1,reachState);
+            states.push_back(reachState);
+            cValue+=step;
+        }
+
         si_->copyState(motion->state, st);
         siC_->nullControl(motion->control);
         nn_->add(motion);
@@ -134,6 +164,8 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     base::State *rstate = rmotion->state;
     Control *rctrl = rmotion->control;
     
+    
+    
     base::State *xstate = si_->allocState();
 
     while (ptc == false)
@@ -146,6 +178,15 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
 
         /* find closest state in the tree */
         Motion *nmotion = nn_->nearest(rmotion);
+
+
+        //compare the distances
+        for(int i=0;i<nmotion->states.size();i++){
+            base::State* rqstate=nmotion->states[i];
+            double dist1=distanceFunction2(nmotion,rqstate);
+            double dist2=distanceFunction2(rmotion,rqstate);
+        }
+
 
         /* sample a random control that attempts to go towards the random state, and also sample a control duration */
         unsigned int cd = controlSampler_->sampleTo(rctrl, nmotion->control, nmotion->state, rmotion->state);
