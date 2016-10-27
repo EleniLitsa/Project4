@@ -112,10 +112,11 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     ob::RealVectorBounds cbounds = cvspace->getBounds();
     double low=cbounds.low[0];
     double high=cbounds.high[0];
+    double jump=(high-low)/numControls;
 
 
     //ob::RealVectorBounds cbounds = dynamic_cast<std::shared_ptr<RealVectorControlSpace>>(cspace) ->getBounds();
-
+    int controlsteps=1;
     while (const base::State *st = pis_.nextStart())
     {
         auto *motion = new Motion(siC_);
@@ -124,7 +125,6 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
 
         //add R(q) to controls and states.
         double cValue=0.0;
-        double step=(high-low)/numControls;
         for(int i=0;i<numControls;i++){
             //RealVectorControlSpace* control = siC_->allocControl()->as<RealVectorControlSpace>();
             //Control *control = siC_->allocControl();
@@ -133,9 +133,9 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
             control->values[0]=cValue;
             controls.push_back(control);
             base::State *reachState;
-            siC_->propagate(st,control,1,reachState);
+            siC_->propagate(st,control,controlsteps,reachState);
             states.push_back(reachState);
-            cValue+=step;
+            cValue+=jump;
         }
 
         si_->copyState(motion->state, st);
@@ -260,10 +260,30 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
             {
                 /* create a motion */
                 auto *motion = new Motion(siC_);
-                si_->copyState(motion->state, rmotion->state);
-                siC_->copyControl(motion->control, rctrl);
-                motion->steps = cd;
+                //si_->copyState(motion->state, rmotion->state);
+                si_->copyState(motion->state, foundState);
+                //siC_->copyControl(motion->control, rctrl);
+                siC_->copyControl(motion->control, foundControl);
+                //motion->steps = cd;
+                motion->steps = controlsteps;
                 motion->parent = nmotion;
+
+                //std::vector<Control*> controls=motion->controls;
+                //std::vector
+                //add R(q) to controls and states.
+                double cValue=0.0;
+                for(int i=0;i<numControls;i++){
+                    //RealVectorControlSpace* control = siC_->allocControl()->as<RealVectorControlSpace>();
+                    //Control *control = siC_->allocControl();
+                    RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
+                    //RealVectorControlSpace::ControlType* control = *(siC_->allocControl()) ->as<RealVectorControlSpace::ControlType*>();
+                    control->values[0]=cValue;
+                    controls.push_back(control);
+                    base::State *reachState;
+                    siC_->propagate(st,control,controlsteps,reachState);
+                    states.push_back(reachState);
+                    cValue+=jump;
+                }
 
                 nn_->add(motion);
                 double dist = 0.0;
