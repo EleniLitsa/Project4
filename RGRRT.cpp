@@ -170,22 +170,37 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
 
     while (ptc == false)
     {
-        /* sample random state (with goal biasing) */
-        if (goal_s && rng_.uniform01() < goalBias_ && goal_s->canSample())
-            goal_s->sampleGoal(rstate);
-        else
-            sampler_->sampleUniform(rstate);
+        bool hadFoundState=false;
+        ob::State *foundState=NULL;
+        Control *foundControl=NULL;
 
-        /* find closest state in the tree */
-        Motion *nmotion = nn_->nearest(rmotion);
+        Motion *nmotion;
+
+        while (!hadFoundState){
+            /* sample random state (with goal biasing) */
+            if (goal_s && rng_.uniform01() < goalBias_ && goal_s->canSample())
+                goal_s->sampleGoal(rstate);
+            else
+                sampler_->sampleUniform(rstate);
+
+            /* find closest state in the tree */
+            nmotion = nn_->nearest(rmotion);
 
 
-        //compare the distances
-        for(int i=0;i<nmotion->states.size();i++){
-            base::State* rqstate=nmotion->states[i];
-            double dist1=distanceFunction2(nmotion,rqstate);
-            double dist2=distanceFunction2(rmotion,rqstate);
+            //compare the distances
+            for(int i=0;i<nmotion->states.size() and hadFoundState==false;i++){
+                base::State* rqstate=nmotion->states[i];
+                double dist1=distanceFunction2(nmotion,rqstate);
+                double dist2=distanceFunction2(rmotion,rqstate);
+                if(dist2<dist1){
+                    hadFoundState=true;
+                    foundState=nmotion->states[i];
+                    foundControl=nmotion->controls[i];
+                }
+            }
+
         }
+        
 
 
         /* sample a random control that attempts to go towards the random state, and also sample a control duration */
