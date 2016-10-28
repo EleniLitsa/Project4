@@ -54,16 +54,14 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
  
      const ob::SO2StateSpace::StateType *rot = s->as<ob::SO2StateSpace::StateType>(1);
  
- 
- 
      // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
      return si->satisfiesBounds(state) && (const void*)rot != (const void*)pos;
  }
 
 void planWithSimpleSetup(void){
-ob::StateSpacePtr s;
+ob::StateSpacePtr space;
 
-ob::StateSpacePtr r3(new ompl::base::RealVectorStateSpace(3)); // x-y space
+ob::StateSpacePtr r3(new ob::RealVectorStateSpace(3)); // x-y space
  // Set bounds for x and y
     ob::RealVectorBounds bounds(3);
     bounds.setLow(-10,1); // minimum value of x
@@ -78,10 +76,10 @@ ob::StateSpacePtr r3(new ompl::base::RealVectorStateSpace(3)); // x-y space
 
 ob::StateSpacePtr so2(new ob::SO2StateSpace());  // angle
 
-s = r3 + so2;
+space = r3 + so2;
 
 // create the state space 
- ob::StateSpacePtr space(s);
+// ob::StateSpacePtr space(s);
 
 // create the control space
  oc::ControlSpacePtr cspace(new oc::RealVectorControlSpace(space, 2));
@@ -109,13 +107,13 @@ ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &postPropagat
 
      // set start and goal configuration
 
-    ob::ScopedState<> start(s);
+    ob::ScopedState<> start(space);
     start[0] = -4.0;
     start[1] = -4.0;
     start[2] = 0.0;
     start[3] = 0.0;
 
-    ob::ScopedState<> goal(s);
+    ob::ScopedState<> goal(space);
     goal[0] = 4.0;
     goal[1] = 4.0;
     goal[2] = 0.0;
@@ -140,7 +138,6 @@ std::cout << "Found solution:" << std::endl;
 }
 else
 std::cout << "No solution found" << std::endl;
-
 
 }
 

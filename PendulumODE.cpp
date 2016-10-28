@@ -1,7 +1,9 @@
 #include <ompl/control/SpaceInformation.h>
 #include <ompl/base/spaces/SE2StateSpace.h>
+#include <ompl/base/spaces/SO2StateSpace.h>
 #include <ompl/control/ODESolver.h>
 #include <ompl/control/spaces/RealVectorControlSpace.h>
+#include <ompl/control/planners/rrt/RRT.h>
 #include <ompl/control/SimpleSetup.h>
 #include <ompl/config.h>
 #include <iostream>
@@ -42,8 +44,20 @@ void postPropagate(const base::State* state, const Control* control, const doubl
 }
 
 
+bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
+ {
+     const ob::CompoundStateSpace::StateType *s = state->as<ob::CompoundStateSpace::StateType>();
+ 
+     const ob::RealVectorStateSpace::StateType *pos = s->as<ob::RealVectorStateSpace::StateType>(0);
+ 
+     const ob::SO2StateSpace::StateType *rot = s->as<ob::SO2StateSpace::StateType>(1);
+ 
+     // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
+     return si->satisfiesBounds(state) && (const void*)rot != (const void*)pos;
+ }
+
 void planWithSimpsleSetup(void){
-ompl::base::StateSpacePtr s;
+ob::StateSpacePtr space;
 
 const double pi = boost::math::constants::pi<double>();
 
@@ -58,15 +72,7 @@ ob::StateSpacePtr r1(new ob::RealVectorStateSpace(1));
 
    ob::StateSpacePtr so2(new ob::SO2StateSpace());
 
-    s = r1 + so2;
-
-// create the state space 
- ob::StateSpacePtr space(s);
- // set the bounds for the R^2 part of SE(2) 
- ob::RealVectorBounds bounds(2);
- bounds.setLow(-5);
- bounds.setHigh(5);
- space->as<ob::SE2StateSpace>()->setBounds(bounds);
+    space = r1 + so2;
 
 // create the control space
  oc::ControlSpacePtr cspace(new oc::RealVectorControlSpace(space, 1));
@@ -75,7 +81,7 @@ ob::StateSpacePtr r1(new ob::RealVectorStateSpace(1));
 cbounds.setLow(0);
 cbounds.setHigh(3);
 
-cspace->as<DemoControlSpace>()->setBounds(cbounds);
+cspace->as<oc::RealVectorControlSpace>()->setBounds(cbounds);
 
 
 // define a simple setup class
@@ -86,8 +92,8 @@ cspace->as<DemoControlSpace>()->setBounds(cbounds);
 
 
 // instantiate the derived solver
-oc::ODESolverPtr odeSolver (new ompl::control::ODEBasicSolver<> (ss, &PendulumODE));
-// oc::ODESolverPtr odeSolver (new ompl::control::ODEBasicSolver<> (ss.getSpaceInformation(), &PendulumODE));
+//oc::ODESolverPtr odeSolver (new oc::ODEBasicSolver<> (ss, &PendulumODE));
+oc::ODESolverPtr odeSolver (new oc::ODEBasicSolver<> (ss.getSpaceInformation(), &PendulumODE));
 // StatePropagator: defines how the system moves given a specific control
 ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &postPropagate));
 
@@ -101,43 +107,18 @@ ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &postPropagat
     // fmod(state->as<StateType>()->value, 2.0 * boost::math::constants::pi<double>())
     goal[1] = 0.0;
 
-ss.setup();
 
-// create a problem instance 
-ob::ProblemDefinitionPtr pdef(new ob::ProblemDefinition(ss));
+ss.setStartAndGoalStates(start, goal);
+ob::PlannerPtr planner(new oc::RRT(ss.getSpaceInformation()));
+ss.setPlanner(planner);
+ob::PlannerStatus solved = ss.solve(10.0);
 
-// set the start and goal states
- pdef.setStartAndGoalStates(start, goal, 0.05);
-
-ob::PlannerPtr planner(new oc::RRT(si));
-
-// set the problem we are trying to solve for the planner
- planner->setProblemDefinition(pdef);
-
-// perform setup steps for the planner
-  planner->setup();
-
-// print the settings for this space
- ss.printSettings(std::cout);
-
-
-// attempt to solve the problem within one second of planning
-  ob::PlannerStatus solved = planner.solve(10.0);
-
- if (solved)
-     {
-        // get the goal representation from the problem definition (not the same as the goal state)
-         // and inquire about the found path
-         ob::PathPtr path = pdef.getSolutionPath();
-         std::cout << "Found solution:" << std::endl;
- 
-         // print the path to screen
-         path.print(std::cout);
-     }
-     else
-        std::cout << "No solution found" << std::endl;
-
-
+if (solved)
+{
+std::cout << "Found solution:" << std::endl;
+}
+else
+std::cout << "No solution found" << std::endl;
 }
 
  void main(int, char **)
