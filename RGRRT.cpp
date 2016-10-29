@@ -120,8 +120,8 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     while (const base::State *st = pis_.nextStart())
     {
         auto *motion = new Motion(siC_);
-        std::vector<base::State*> states=motion->states;
-        std::vector<Control*> controls=motion->controls;
+        //std::vector<base::State*> states=motion->states;
+        //std::vector<Control*> controls=motion->controls;
 
         //add R(q) to controls and states.
         double cValue=0.0;
@@ -131,10 +131,10 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
             RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
             //RealVectorControlSpace::ControlType* control = *(siC_->allocControl()) ->as<RealVectorControlSpace::ControlType*>();
             control->values[0]=cValue;
-            controls.push_back(control);
+            motion->controls.push_back(control);
             base::State *reachState;
             siC_->propagate(st,control,controlsteps,reachState);
-            states.push_back(reachState);
+            motion->states.push_back(reachState);
             cValue+=jump;
         }
 
@@ -278,10 +278,10 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
                     RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
                     //RealVectorControlSpace::ControlType* control = *(siC_->allocControl()) ->as<RealVectorControlSpace::ControlType*>();
                     control->values[0]=cValue;
-                    controls.push_back(control);
+                    motion->controls.push_back(control);
                     base::State *reachState;
                     siC_->propagate(st,control,controlsteps,reachState);
-                    states.push_back(reachState);
+                    motion->states.push_back(reachState);
                     cValue+=jump;
                 }
 
