@@ -35,7 +35,7 @@ void PendulumODE(const oc::ODESolver::StateType& q, const oc::Control* c, oc::OD
 
 }
 
-void postPropagate(const base::State* state, const Control* control, const double duration, base::State* result)
+void postPropagate(const ob::State* state, const oc::Control* control, const double duration, ob::State* result)
 {
    ob::SO2StateSpace SO2;
 
@@ -56,7 +56,7 @@ bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
      return si->satisfiesBounds(state) && (const void*)rot != (const void*)pos;
  }
 
-void planWithSimpsleSetup(void){
+void planWithSimpleSetup(void){
 ob::StateSpacePtr space;
 
 const double pi = boost::math::constants::pi<double>();
@@ -113,18 +113,21 @@ ob::PlannerPtr planner(new oc::RRT(ss.getSpaceInformation()));
 ss.setPlanner(planner);
 ob::PlannerStatus solved = ss.solve(10.0);
 
-if (solved)
+ if (solved)
 {
 std::cout << "Found solution:" << std::endl;
+ss.getSolutionPath().printAsMatrix(std::cout);
 }
 else
 std::cout << "No solution found" << std::endl;
+
 }
 
- void main(int, char **)
+
+ int main(int, char **)
  {
       planWithSimpleSetup();
-
+     
       return 0;
  
  }

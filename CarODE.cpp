@@ -23,22 +23,22 @@ void CarODE(const oc::ODESolver::StateType& q, const oc::Control* c, oc::ODESolv
     // Retrieve the current orientation of the car.  The memory for ob::SE2StateSpace is mapped as:
     // 0: x
     // 1: y
-    // 2: theta
-    // 3: velocity
+    // 2: velocity
+    // 3: theta
 
-    const double theta = q[2];
-    const double velocity = q[3];
+    const double velocity = q[2];
+    const double theta = q[3];
     const double angularVelocity= u[0];
     const double acceleration = u[1];
 
     qdot.resize(q.size(), 0);
     qdot[0] = velocity * cos(theta);  // x-dot
     qdot[1] = velocity * sin(theta);  // y-dot
-    qdot[2] = angularVelocity;    // theta-dot
-    qdot[3] = acceleration;    // velocity-dot
+    qdot[2] = acceleration;    // velocity-dot
+    qdot[3] = angularVelocity;    // theta-dot
 }
-void postPropagate (const ob::State*, const oc::Control*, const double, ob::State *result)
-//void postPropagate(const ob::State* state, const oc::Control* control, const double duration, base::State* result)
+//void postPropagate (const ob::State*, const oc::Control*, const double, ob::State *result)
+void postPropagate(const ob::State* state, const oc::Control* control, const double duration, ob::State* result)
 {
    ob::SO2StateSpace SO2;
 
@@ -64,12 +64,12 @@ ob::StateSpacePtr space;
 ob::StateSpacePtr r3(new ob::RealVectorStateSpace(3)); // x-y space
  // Set bounds for x and y
     ob::RealVectorBounds bounds(3);
-    bounds.setLow(-10,1); // minimum value of x
-    bounds.setHigh(10,1); // maximum value of x
-    bounds.setLow(-10,2); // minimum value of y
-    bounds.setHigh(10,2); // maximum value of y
-    bounds.setLow(-0.3,3); // minimum value of velocity
-    bounds.setHigh(0.3,3); // maximum value of velocity
+    bounds.setLow(0,-10.0); // minimum value of x
+    bounds.setHigh(0,10.0); // maximum value of x
+    bounds.setLow(1,-10.0); // minimum value of y
+    bounds.setHigh(1,10.0); // maximum value of y
+    bounds.setLow(2,-0.3); // minimum value of velocity
+    bounds.setHigh(2,0.3); // maximum value of velocity
 
     // Set the bounds
     r3->as<ob::RealVectorStateSpace>()->setBounds(bounds);
@@ -135,6 +135,7 @@ ob::PlannerStatus solved = ss.solve(10.0);
  if (solved)
 {
 std::cout << "Found solution:" << std::endl;
+ss.getSolutionPath().printAsMatrix(std::cout);
 }
 else
 std::cout << "No solution found" << std::endl;
