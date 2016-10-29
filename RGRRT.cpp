@@ -116,8 +116,10 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
 
 
     //ob::RealVectorBounds cbounds = dynamic_cast<std::shared_ptr<RealVectorControlSpace>>(cspace) ->getBounds();
-    int controlsteps=1;
-    while (const base::State *st = pis_.nextStart())
+    int controlsteps=4;
+    const base::State *st;
+
+    while (st = pis_.nextStart())
     {
         auto *motion = new Motion(siC_);
         //std::vector<base::State*> states=motion->states;
@@ -126,10 +128,8 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
         //add R(q) to controls and states.
         double cValue=0.0;
         for(int i=0;i<numControls;i++){
-            //RealVectorControlSpace* control = siC_->allocControl()->as<RealVectorControlSpace>();
-            //Control *control = siC_->allocControl();
             RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
-            //RealVectorControlSpace::ControlType* control = *(siC_->allocControl()) ->as<RealVectorControlSpace::ControlType*>();
+            
             control->values[0]=cValue;
             motion->controls.push_back(control);
             base::State *reachState;
@@ -273,10 +273,8 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
                 //add R(q) to controls and states.
                 double cValue=0.0;
                 for(int i=0;i<numControls;i++){
-                    //RealVectorControlSpace* control = siC_->allocControl()->as<RealVectorControlSpace>();
-                    //Control *control = siC_->allocControl();
+
                     RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
-                    //RealVectorControlSpace::ControlType* control = *(siC_->allocControl()) ->as<RealVectorControlSpace::ControlType*>();
                     control->values[0]=cValue;
                     motion->controls.push_back(control);
                     base::State *reachState;

@@ -19,13 +19,24 @@ LD_FLAGS=-L${OMPL_DIR}/lib -lompl -lompl_app_base  -lompl_app -lboost_program_op
 # The c++ compiler to invoke
 CXX=c++
 
-all:	testrun 
+all:	testrun CarODE PendulumODE
 
 clean:
 	rm -f *.o
 	rm -f testrun
+	rm -f CarODE
+	rm -f PendulumODE
+
 testrun: RGRRT.o odeSample.o 
 	$(CXX) $(CXXFLAGS) $(INCLUDE_FLAGS) -o testrun odeSample.o RGRRT.o  $(LD_FLAGS)
+
+CarODE: CarODE.o
+	$(CXX) $(CXXFLAGS) $(INCLUDE_FLAGS) -o CarODE CarODE.o RGRRT.o $(LD_FLAGS)
+
+PendulumODE: PendulumODE.o
+	$(CXX) $(CXXFLAGS) $(INCLUDE_FLAGS) -o Pendulum PendulumODE.o RGRRT.o $(LD_FLAGS)
+
+
 
 
 %.o: %.cpp

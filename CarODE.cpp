@@ -9,6 +9,7 @@
 #include <iostream>
 #include <valarray>
 #include <limits>
+#include "RGRRT.h"
 
 
 namespace oc = ompl::control;
@@ -127,7 +128,7 @@ ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &postPropagat
 //ob::PlannerStatus solved = planner->solve(10.0);
 
 ss.setStartAndGoalStates(start, goal);
-ob::PlannerPtr planner(new oc::RRT(ss.getSpaceInformation()));
+ob::PlannerPtr planner(new oc::RGRRT(ss.getSpaceInformation()));
 ss.setPlanner(planner);
 ob::PlannerStatus solved = ss.solve(10.0);
 

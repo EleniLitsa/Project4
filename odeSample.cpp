@@ -39,6 +39,7 @@
 #include <ompl/control/ODESolver.h>
 #include <ompl/control/spaces/RealVectorControlSpace.h>
 #include <ompl/control/SimpleSetup.h>
+#include <ompl/control/planners/rrt/RRT.h>
 #include <ompl/config.h>
 #include <iostream>
 #include <valarray>
@@ -220,8 +221,13 @@ void planWithSimpleSetup()
     /// set the start and goal states
     ss.setStartAndGoalStates(start, goal, 0.05);
 
+    ob::PlannerPtr planner(new oc::RGRRT(ss.getSpaceInformation()));
+    ss.setPlanner(planner);
+
     /// we want to have a reasonable value for the propagation step size
     ss.setup();
+
+
 
     /// attempt to solve the problem within one second of planning time
     ob::PlannerStatus solved = ss.solve(10.0);
