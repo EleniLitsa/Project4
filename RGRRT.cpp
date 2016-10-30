@@ -113,35 +113,60 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     double low=cbounds.low[0];
     double high=cbounds.high[0];
     double jump=(high-low)/numControls;
+    int controlDuration=1;
 
-
-    //ob::RealVectorBounds cbounds = dynamic_cast<std::shared_ptr<RealVectorControlSpace>>(cspace) ->getBounds();
-    int controlsteps=4;
-    const base::State *st;
-
-    while (st = pis_.nextStart())
+    while (const base::State *st = pis_.nextStart())
     {
         auto *motion = new Motion(siC_);
-        //std::vector<base::State*> states=motion->states;
-        //std::vector<Control*> controls=motion->controls;
+        si_->copyState(motion->state, st);
+        siC_->nullControl(motion->control);
 
-        //add R(q) to controls and states.
         double cValue=0.0;
         for(int i=0;i<numControls;i++){
-            RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
+            RealVectorControlSpace::ControlType* control = 
+            dynamic_cast<RealVectorControlSpace::ControlType*>
+            (siC_->allocControl());
             
             control->values[0]=cValue;
             motion->controls.push_back(control);
-            base::State *reachState;
-            siC_->propagate(st,control,controlsteps,reachState);
-            motion->states.push_back(reachState);
+
+            //testCode
+            // RealVectorControlSpace::ControlType* tcontrol = 
+            // dynamic_cast<RealVectorControlSpace::ControlType*>
+            // (motion->controls[i]);
+            // printf("FC:%f; ",tcontrol->values[0]);
+            //testCodeEnd
+
+            //base::State *reachState;
+            //siC_->propagate(st,control,controlDuration,reachState);
+            std::vector<base::State *> pstates;
+            siC_->propagateWhileValid(motion->state, control, controlDuration, pstates, true);
+            //printf("pss:%d;",pstates.size());
+            // for(int j=0;j<pstates.size();j++){
+            //     motion->states.push_back(pstates[j]);
+            // }
+            motion->states.push_back(pstates[controlDuration-1]);
+            //motion->states.push_back(reachState);
             cValue+=jump;
         }
+        //testCode
+        printf("mincd:%d;",siC_->getMinControlDuration());
+        //printf("(ss,cs):(%d,%d);",
+         //    motion->states.size(),
+         //    motion->controls.size());
+        //testCodeEnd
 
-        si_->copyState(motion->state, st);
-        siC_->nullControl(motion->control);
         nn_->add(motion);
     }
+    //testCode
+    // std::vector<Motion*> mvector;
+    // nn_->list(mvector);
+    // printf("mvs:%d",mvector.size());
+    // RealVectorControlSpace::ControlType* tcontrol = 
+    // dynamic_cast<RealVectorControlSpace::ControlType*>
+    // (mvector[0]->controls[2]);
+    // printf("FC:%f; ",tcontrol->values[0]);
+    //testCodeEnd
 
     if (nn_->size() == 0)
     {
@@ -163,19 +188,17 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     auto *rmotion = new Motion(siC_);
     base::State *rstate = rmotion->state;
     Control *rctrl = rmotion->control;
-    
-    
-    
     base::State *xstate = si_->allocState();
 
     while (ptc == false)
     {
-        bool hadFoundState=false;
+        
+
         ob::State *foundState=NULL;
         Control *foundControl=NULL;
+        bool hadFoundState=false;
 
         Motion *nmotion;
-
         while (!hadFoundState){
             /* sample random state (with goal biasing) */
             if (goal_s && rng_.uniform01() < goalBias_ && goal_s->canSample())
@@ -185,120 +208,104 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
 
             /* find closest state in the tree */
             nmotion = nn_->nearest(rmotion);
+            
+            //std::vector<Control*> ncontrols=nmotion->controls;   
+            //testCode
+            // RealVectorControlSpace::ControlType* tcontrol = 
+            // dynamic_cast<RealVectorControlSpace::ControlType*>
+            // (ncontrols[2]);
+            // printf("FC:%f; ",tcontrol->values[0]);
+            // printf("(ss,cs):(%d,%d);",
+            //     nmotion->states.size(),
+            //     nmotion->controls.size());
+            //testCodeEnd
 
 
-            //compare the distances
-            for(int i=0;i<nmotion->states.size() and hadFoundState==false;i++){
+            
+            for(int i=0;i<nmotion->states.size();i++){
+                
                 base::State* rqstate=nmotion->states[i];
-                double dist1=distanceFunction2(nmotion,rqstate);
-                double dist2=distanceFunction2(rmotion,rqstate);
+                Control* rqcontrol=nmotion->controls[i];
+
+                // double dist1=distanceFunction2(nmotion,rqstate);
+                // double dist2=distanceFunction2(rmotion,rqstate);
+                double dist1=si_->distance(nmotion->state, rqstate);
+                double dist2=si_->distance(rmotion->state, rqstate);
+
+                //testCode
+                //printf("i:%d;",i);
+                // RealVectorControlSpace::ControlType* tcontrol = 
+                // dynamic_cast<RealVectorControlSpace::ControlType*>
+                // (rqcontrol);
+                // printf("i:%d,d:(%f,%f);",i,dist1,dist2);
+                //printf("i:%d,FC:%f; ",i,tcontrol->values[0]);
+                
+                //testCodeEnd
                 if(dist2<dist1){
                     hadFoundState=true;
                     foundState=nmotion->states[i];
                     foundControl=nmotion->controls[i];
+                    
                 }
             }
-
         }
-        
 
+        // RealVectorControlSpace::ControlType* fcontrol = 
+        //     dynamic_cast<RealVectorControlSpace::ControlType*>
+        //     (foundControl);
+        // printf("FC:%f; ",fcontrol->values[0]);
+        
 
         /* sample a random control that attempts to go towards the random state, and also sample a control duration */
         unsigned int cd = controlSampler_->sampleTo(rctrl, nmotion->control, nmotion->state, rmotion->state);
 
-        if (addIntermediateStates_)
+        
+        if (controlDuration >= siC_->getMinControlDuration())
+        //if (controlDuration >= siC_->getMinControlDuration())
         {
-            // this code is contributed by Jennifer Barry
-            std::vector<base::State *> pstates;
-            cd = siC_->propagateWhileValid(nmotion->state, rctrl, cd, pstates, true);
+            /* create a motion */
+            auto *motion = new Motion(siC_);
+            //si_->copyState(motion->state, rmotion->state);
+            si_->copyState(motion->state, foundState);
+            //siC_->copyControl(motion->control, rctrl);
+            siC_->copyControl(motion->control, foundControl);
+            //motion->steps = cd;
+            motion->steps = controlDuration;
+            motion->parent = nmotion;
 
-            if (cd >= siC_->getMinControlDuration())
-            {
-                Motion *lastmotion = nmotion;
-                bool solved = false;
-                size_t p = 0;
-                for (; p < pstates.size(); ++p)
-                {
-                    /* create a motion */
-                    auto *motion = new Motion();
-                    motion->state = pstates[p];
-                    // we need multiple copies of rctrl
-                    motion->control = siC_->allocControl();
-                    siC_->copyControl(motion->control, rctrl);
-                    motion->steps = 1;
-                    motion->parent = lastmotion;
-                    lastmotion = motion;
-                    nn_->add(motion);
-                    double dist = 0.0;
-                    solved = goal->isSatisfied(motion->state, &dist);
-                    if (solved)
-                    {
-                        approxdif = dist;
-                        solution = motion;
-                        break;
-                    }
-                    if (dist < approxdif)
-                    {
-                        approxdif = dist;
-                        approxsol = motion;
-                    }
-                }
-
-                // free any states after we hit the goal
-                while (++p < pstates.size())
-                    si_->freeState(pstates[p]);
-                if (solved)
-                    break;
+            double cValue=0.0;
+            for(int i=0;i<numControls;i++){
+                RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
+                
+                control->values[0]=cValue;
+                motion->controls.push_back(control);
+                //base::State *reachState;
+                //siC_->propagate(st,control,controlDuration,reachState);
+                std::vector<base::State *> pstates;
+                siC_->propagateWhileValid(motion->state, control, controlDuration, pstates, true);
+                // for(int j=0;j<pstates.size();j++){
+                //     motion->states.push_back(pstates[j]);
+                // }
+                motion->states.push_back(pstates[controlDuration-1]);
+                //motion->states.push_back(reachState);
+                cValue+=jump;
             }
-            else
-                for (auto &pstate : pstates)
-                    si_->freeState(pstate);
-        }
-        else
-        {
-            if (cd >= siC_->getMinControlDuration())
+            nn_->add(motion);
+            double dist = 0.0;
+            bool solv = goal->isSatisfied(motion->state, &dist);
+            if (solv)
             {
-                /* create a motion */
-                auto *motion = new Motion(siC_);
-                //si_->copyState(motion->state, rmotion->state);
-                si_->copyState(motion->state, foundState);
-                //siC_->copyControl(motion->control, rctrl);
-                siC_->copyControl(motion->control, foundControl);
-                //motion->steps = cd;
-                motion->steps = controlsteps;
-                motion->parent = nmotion;
-
-                //std::vector<Control*> controls=motion->controls;
-                //std::vector
-                //add R(q) to controls and states.
-                double cValue=0.0;
-                for(int i=0;i<numControls;i++){
-
-                    RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
-                    control->values[0]=cValue;
-                    motion->controls.push_back(control);
-                    base::State *reachState;
-                    siC_->propagate(st,control,controlsteps,reachState);
-                    motion->states.push_back(reachState);
-                    cValue+=jump;
-                }
-
-                nn_->add(motion);
-                double dist = 0.0;
-                bool solv = goal->isSatisfied(motion->state, &dist);
-                if (solv)
-                {
-                    approxdif = dist;
-                    solution = motion;
-                    break;
-                }
-                if (dist < approxdif)
-                {
-                    approxdif = dist;
-                    approxsol = motion;
-                }
+                approxdif = dist;
+                solution = motion;
+                break;
+            }
+            if (dist < approxdif)
+            {
+                approxdif = dist;
+                approxsol = motion;
             }
         }
+        
     }
 
     bool solved = false;
