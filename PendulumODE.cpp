@@ -1,25 +1,24 @@
 #include <ompl/control/SpaceInformation.h>
 #include <ompl/base/spaces/SE2StateSpace.h>
-#include <ompl/base/spaces/SO2StateSpace.h>
 #include <ompl/control/ODESolver.h>
 #include <ompl/control/spaces/RealVectorControlSpace.h>
-#include <ompl/control/planners/rrt/RRT.h>
 #include <ompl/control/SimpleSetup.h>
+#include <ompl/control/planners/rrt/RRT.h>
+#include "RGRRT.h"
 #include <ompl/config.h>
 #include <iostream>
 #include <valarray>
 #include <limits>
-#include <cmath>
 
-
-namespace oc = ompl::control;
 namespace ob = ompl::base;
+namespace oc = ompl::control;
 
 
-void PendulumODE(const oc::ODESolver::StateType& q, const oc::Control* c, oc::ODESolver::StateType& qdot)
+// Definition of the ODE for the pendulum.
+void PendulumODE (const oc::ODESolver::StateType& q, const oc::Control* control, oc::ODESolver::StateType& qdot)
 {
-    // Retrieve control values.  
-    const double *u = c->as<ompl::control::RealVectorControlSpace::ControlType>()->values;
+     // Retrieve control values.  
+    const double *u = control->as<oc::RealVectorControlSpace::ControlType>()->values;
  
     // Retrieve the current state of the pendulum.  The memory for ompl::base::SE2StateSpace is mapped as:
     // 0: theta
@@ -32,35 +31,41 @@ void PendulumODE(const oc::ODESolver::StateType& q, const oc::Control* c, oc::OD
     qdot.resize(q.size(), 0);
     qdot[0] = velocity;   // theta-dot
     qdot[1] = -9.81 * cos(theta) + torque;   // rotational velocity-dot
-
 }
 
-void postPropagate(const ob::State* state, const oc::Control* control, const double duration, ob::State* result)
+void postPropagate (const ob::State* /*state*/, const oc::Control* /*control*/, const double /*duration*/, ob::State *result)
 {
-   ob::SO2StateSpace SO2;
+    // Normalize orientation between 0 and 2*pi
+    ob::SO2StateSpace SO2;
 
-  ob::SE2StateSpace::StateType& s = *result->as<ompl::base::SE2StateSpace::StateType>();
-  SO2.enforceBounds(s[1]);
+    ob::SE2StateSpace::StateType& s = *result->as<ompl::base::SE2StateSpace::StateType>();
+    SO2.enforceBounds(s[1]);
 }
-
 
 bool isStateValid(const oc::SpaceInformation *si, const ob::State *state)
- {
-     const ob::CompoundStateSpace::StateType *s = state->as<ob::CompoundStateSpace::StateType>();
- 
-     const ob::RealVectorStateSpace::StateType *pos = s->as<ob::RealVectorStateSpace::StateType>(0);
- 
-     const ob::SO2StateSpace::StateType *rot = s->as<ob::SO2StateSpace::StateType>(1);
- 
-     // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
-     return si->satisfiesBounds(state) && (const void*)rot != (const void*)pos;
- }
+{
+    /// cast the abstract state type to the type we expect
+    const ob::CompoundStateSpace::StateType *s = state->as<ob::CompoundStateSpace::StateType>();
 
-void planWithSimpleSetup(void){
-ob::StateSpacePtr space;
+    /// extract the first component of the state and cast it to what we expect
+    const ob::RealVectorStateSpace::StateType *pos = s->as<ob::RealVectorStateSpace::StateType>(0);
 
-const double pi = boost::math::constants::pi<double>();
+    /// extract the second component of the state and cast it to what we expect
+    const ob::SO2StateSpace::StateType *rot = s->as<ob::SO2StateSpace::StateType>(1);
 
+    // return a value that is always true but uses the two variables we define, so we avoid compiler warnings
+    return si->satisfiesBounds(state) && (const void*)rot != (const void*)pos;
+}
+
+
+void planWithSimpleSetup()
+{
+    const double pi = boost::math::constants::pi<double>();
+
+    // create the state space
+    ob::StateSpacePtr space;
+
+    
 ob::StateSpacePtr r1(new ob::RealVectorStateSpace(1));
  // Set bounds on R^1
     ob::RealVectorBounds bounds(1);
@@ -70,65 +75,74 @@ ob::StateSpacePtr r1(new ob::RealVectorStateSpace(1));
     // Set the bounds
     r1->as<ob::RealVectorStateSpace>()->setBounds(bounds);
 
-   ob::StateSpacePtr so2(new ob::SO2StateSpace());
+   ob::StateSpacePtr so2(new ob::SO2StateSpace());  // angle
 
-    space = r1 + so2;
-
-// create the control space
- oc::ControlSpacePtr cspace(new oc::RealVectorControlSpace(space, 1));
-// set the bounds for the torque
-  ob::RealVectorBounds cbounds(1);
-cbounds.setLow(0);
-cbounds.setHigh(3);
-
-cspace->as<oc::RealVectorControlSpace>()->setBounds(cbounds);
+   space = r1 + so2;
 
 
-// define a simple setup class
- oc::SimpleSetup ss(cspace);
+    // create the control space
+    oc::ControlSpacePtr cspace(new oc::RealVectorControlSpace(space, 2));
+    // set the bounds for the control space
+    ob::RealVectorBounds cbounds(2);
+    cbounds.setLow(-0.3);
+    cbounds.setHigh(0.3);
 
-// set state validity checking for this space
- ss.setStateValidityChecker(std::bind(&isStateValid, ss.getSpaceInformation().get(), std::placeholders::_1));
+    //cspace->setBounds(cbounds);
+    cspace->as<oc::RealVectorControlSpace>()->setBounds(cbounds);
 
+    // define a simple setup class
+    oc::SimpleSetup ss(cspace);
 
-// instantiate the derived solver
-//oc::ODESolverPtr odeSolver (new oc::ODEBasicSolver<> (ss, &PendulumODE));
-oc::ODESolverPtr odeSolver (new oc::ODEBasicSolver<> (ss.getSpaceInformation(), &PendulumODE));
-// StatePropagator: defines how the system moves given a specific control
-ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &postPropagate));
+    // set state validity checking for this space
+    oc::SpaceInformation *si = ss.getSpaceInformation().get();
+    ss.setStateValidityChecker(
+        [si](const ob::State *state) { return isStateValid(si, state); });
 
-     // set start and goal configuration
-    ob::ScopedState<> start(space);
+    // instantiate the derived solver
+    auto odeSolver(std::make_shared<oc::ODEBasicSolver<>>(ss.getSpaceInformation(), &PendulumODE));
+    //StatePropagator: defines how the system moves given a specific control
+    ss.setStatePropagator(oc::ODESolver::getStatePropagator(odeSolver, &postPropagate));
+
+    // create a start state
+    ob::ScopedState<ob::SE2StateSpace> start(space);
     start[0] = -pi/2;
     start[1] = 0.0;
-   
-     ob::ScopedState<> goal(space);
+
+    // create a  goal state
+    ob::ScopedState<ob::SE2StateSpace> goal(space);
     goal[0] = pi/2;
     // fmod(state->as<StateType>()->value, 2.0 * boost::math::constants::pi<double>())
     goal[1] = 0.0;
 
+    /// set the start and goal states
+    ss.setStartAndGoalStates(start, goal);
+    //ss.setStartAndGoalStates(start, goal, 0.05);
 
-ss.setStartAndGoalStates(start, goal);
-ob::PlannerPtr planner(new oc::RRT(ss.getSpaceInformation()));
-ss.setPlanner(planner);
-ob::PlannerStatus solved = ss.solve(10.0);
+    // set the planner
+    ob::PlannerPtr planner(new oc::RRT(ss.getSpaceInformation()));
+    //ob::PlannerPtr planner(new oc::RGRRT(ss.getSpaceInformation())); 
+    ss.setPlanner(planner);
 
- if (solved)
+    // attempt to solve the problem within ten seconds
+    ob::PlannerStatus solved = ss.solve(10.0);
+
+
+    if (solved)
+    {
+        std::cout << "Found solution:" << std::endl;
+        
+        // print the path to screen        
+        ss.getSolutionPath().asGeometric().printAsMatrix(std::cout);
+    }
+    else
+        std::cout << "No solution found" << std::endl;
+}
+
+int main(int, char **)
 {
-std::cout << "Found solution:" << std::endl;
-ss.getSolutionPath().printAsMatrix(std::cout);
+    std::cout << "OMPL version: " << OMPL_VERSION << std::endl;
+
+    planWithSimpleSetup();
+
+    return 0;
 }
-else
-std::cout << "No solution found" << std::endl;
-
-}
-
-
- int main(int, char **)
- {
-      planWithSimpleSetup();
-     
-      return 0;
- 
- }
-
