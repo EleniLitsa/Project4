@@ -34,11 +34,28 @@
 
 /* Author: Ioan Sucan */
 
+//direct control sampler
+
 #include "RGRRT.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
 #include "ompl/control/spaces/RealVectorControlSpace.h"
 #include <limits>
+
+#include <iostream>
+#include <ctime>
+#include <cstdlib>
+
+clock_t startTime=0;
+
+void start(){
+    startTime = clock(); //Start timer
+}
+
+void end(int mark){
+    double secondsPassed = (clock() - startTime) / CLOCKS_PER_SEC;
+    printf("Marker#%d:%f\n",mark,secondsPassed);
+}
 
 ompl::control::RGRRT::RGRRT(const SpaceInformationPtr &si) : base::Planner(si, "RRT")
 {
@@ -46,6 +63,7 @@ ompl::control::RGRRT::RGRRT(const SpaceInformationPtr &si) : base::Planner(si, "
     siC_ = si.get();
     addIntermediateStates_ = false;
     lastGoalMotion_ = nullptr;
+    maxDistance_ = 0.0;
 
     goalBias_ = 0.05;
 
@@ -61,6 +79,10 @@ ompl::control::RGRRT::~RGRRT()
 void ompl::control::RGRRT::setup()
 {
     base::Planner::setup();
+    tools::SelfConfig sc(si_, getName());
+    sc.configurePlannerRange(maxDistance_);
+    double constant=4;
+    maxDistance_=maxDistance_/constant;
     if (!nn_)
         nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<Motion *>(this));
     nn_->setDistanceFunction([this](const Motion *a, const Motion *b)
@@ -99,6 +121,7 @@ void ompl::control::RGRRT::freeMemory()
 
 ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTerminationCondition &ptc)
 {
+    
     checkValidity();
     base::Goal *goal = pdef_->getGoal().get();
     base::GoalSampleableRegion *goal_s = dynamic_cast<base::GoalSampleableRegion *>(goal);
@@ -110,11 +133,27 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
     std::shared_ptr<oc::ControlSpace> cspace = siC_->getControlSpace();
     RealVectorControlSpace* cvspace = cspace->as<RealVectorControlSpace>();
     ob::RealVectorBounds cbounds = cvspace->getBounds();
+    int numCtrlDim=(int)cbounds.low.size();
+    printf("numCtrlDim:%d;",numCtrlDim);
+    printf("MaxDist:%f;", maxDistance_);
+    // std::vector<double> highs;
+    // std::vector<double> lows;
+    // std::vector<double> jumps;
     double low=cbounds.low[0];
     double high=cbounds.high[0];
     double jump=(high-low)/numControls;
+    
     int controlDuration=1;
-
+    // for(int i=0;i<numCtrlDim;i++){
+    //     double low=cbounds.low[i];
+    //     double high=cbounds.high[i];
+    //     lows.push_back(low);
+    //     highs.push_back(high);
+    //     jumps.push_back((high-low)/numControls);
+    // }
+    
+    
+    start();
     while (const base::State *st = pis_.nextStart())
     {
         auto *motion = new Motion(siC_);
@@ -126,47 +165,21 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
             RealVectorControlSpace::ControlType* control = 
             dynamic_cast<RealVectorControlSpace::ControlType*>
             (siC_->allocControl());
+            siC_->copyControl(motion->control, control);
             
             control->values[0]=cValue;
             motion->controls.push_back(control);
 
-            //testCode
-            // RealVectorControlSpace::ControlType* tcontrol = 
-            // dynamic_cast<RealVectorControlSpace::ControlType*>
-            // (motion->controls[i]);
-            // printf("FC:%f; ",tcontrol->values[0]);
-            //testCodeEnd
-
-            //base::State *reachState;
-            //siC_->propagate(st,control,controlDuration,reachState);
             std::vector<base::State *> pstates;
             siC_->propagateWhileValid(motion->state, control, controlDuration, pstates, true);
-            //printf("pss:%d;",pstates.size());
-            // for(int j=0;j<pstates.size();j++){
-            //     motion->states.push_back(pstates[j]);
-            // }
+
             motion->states.push_back(pstates[controlDuration-1]);
-            //motion->states.push_back(reachState);
             cValue+=jump;
         }
-        //testCode
-        printf("mincd:%d;",siC_->getMinControlDuration());
-        //printf("(ss,cs):(%d,%d);",
-         //    motion->states.size(),
-         //    motion->controls.size());
-        //testCodeEnd
 
         nn_->add(motion);
     }
-    //testCode
-    // std::vector<Motion*> mvector;
-    // nn_->list(mvector);
-    // printf("mvs:%d",mvector.size());
-    // RealVectorControlSpace::ControlType* tcontrol = 
-    // dynamic_cast<RealVectorControlSpace::ControlType*>
-    // (mvector[0]->controls[2]);
-    // printf("FC:%f; ",tcontrol->values[0]);
-    //testCodeEnd
+    end(1);
 
     if (nn_->size() == 0)
     {
@@ -199,6 +212,8 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
         bool hadFoundState=false;
 
         Motion *nmotion;
+        //start();
+        int numfail=0;
         while (!hadFoundState){
             /* sample random state (with goal biasing) */
             if (goal_s && rng_.uniform01() < goalBias_ && goal_s->canSample())
@@ -208,17 +223,9 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
 
             /* find closest state in the tree */
             nmotion = nn_->nearest(rmotion);
-            
-            //std::vector<Control*> ncontrols=nmotion->controls;   
-            //testCode
-            // RealVectorControlSpace::ControlType* tcontrol = 
-            // dynamic_cast<RealVectorControlSpace::ControlType*>
-            // (ncontrols[2]);
-            // printf("FC:%f; ",tcontrol->values[0]);
-            // printf("(ss,cs):(%d,%d);",
-            //     nmotion->states.size(),
-            //     nmotion->controls.size());
-            //testCodeEnd
+            base::State *dstate = rstate;
+
+
 
 
             
@@ -232,15 +239,7 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
                 double dist1=si_->distance(nmotion->state, rqstate);
                 double dist2=si_->distance(rmotion->state, rqstate);
 
-                //testCode
-                //printf("i:%d;",i);
-                // RealVectorControlSpace::ControlType* tcontrol = 
-                // dynamic_cast<RealVectorControlSpace::ControlType*>
-                // (rqcontrol);
-                // printf("i:%d,d:(%f,%f);",i,dist1,dist2);
-                //printf("i:%d,FC:%f; ",i,tcontrol->values[0]);
-                
-                //testCodeEnd
+
                 if(dist2<dist1){
                     hadFoundState=true;
                     foundState=nmotion->states[i];
@@ -249,6 +248,8 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
                 }
             }
         }
+        //printf("numfail:%d;",numfail);
+        //end(2);
 
         // RealVectorControlSpace::ControlType* fcontrol = 
         //     dynamic_cast<RealVectorControlSpace::ControlType*>
@@ -259,42 +260,47 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
         /* sample a random control that attempts to go towards the random state, and also sample a control duration */
         unsigned int cd = controlSampler_->sampleTo(rctrl, nmotion->control, nmotion->state, rmotion->state);
 
-        
+        //start();
         if (controlDuration >= siC_->getMinControlDuration())
         //if (controlDuration >= siC_->getMinControlDuration())
         {
             /* create a motion */
             auto *motion = new Motion(siC_);
             //si_->copyState(motion->state, rmotion->state);
-            si_->copyState(motion->state, foundState);
-            //siC_->copyControl(motion->control, rctrl);
-            siC_->copyControl(motion->control, foundControl);
-            //motion->steps = cd;
-            motion->steps = controlDuration;
+            //si_->copyState(motion->state, foundState);
+            std::vector<base::State *> pstates;
+            siC_->propagateWhileValid(nmotion->state, rctrl, controlDuration, pstates, true);
+            si_->copyState(motion->state, pstates[controlDuration-1]);
+
+            siC_->copyControl(motion->control, rctrl);
+            //siC_->copyControl(motion->control, foundControl);
+            motion->steps = cd;
+            //motion->steps = controlDuration;
             motion->parent = nmotion;
 
             double cValue=0.0;
             for(int i=0;i<numControls;i++){
-                RealVectorControlSpace::ControlType* control = dynamic_cast<RealVectorControlSpace::ControlType*>(siC_->allocControl());
+                RealVectorControlSpace::ControlType* control = 
+                dynamic_cast<RealVectorControlSpace::ControlType*>
+                (siC_->allocControl());
+                siC_->copyControl(motion->control, control);
                 
                 control->values[0]=cValue;
                 motion->controls.push_back(control);
-                //base::State *reachState;
-                //siC_->propagate(st,control,controlDuration,reachState);
+
                 std::vector<base::State *> pstates;
                 siC_->propagateWhileValid(motion->state, control, controlDuration, pstates, true);
-                // for(int j=0;j<pstates.size();j++){
-                //     motion->states.push_back(pstates[j]);
-                // }
+
                 motion->states.push_back(pstates[controlDuration-1]);
-                //motion->states.push_back(reachState);
                 cValue+=jump;
             }
+
             nn_->add(motion);
             double dist = 0.0;
             bool solv = goal->isSatisfied(motion->state, &dist);
             if (solv)
             {
+                printf("solve:%d;",solv);
                 approxdif = dist;
                 solution = motion;
                 break;
@@ -305,6 +311,7 @@ ompl::base::PlannerStatus ompl::control::RGRRT::solve(const base::PlannerTermina
                 approxsol = motion;
             }
         }
+        //end(3);
         
     }
 
